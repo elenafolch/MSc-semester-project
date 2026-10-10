@@ -9,7 +9,8 @@ class onedim_model(nn.Module):
 
       self.fc1 = nn.Linear(in_features=1, out_features=100) 
       self.fc2 = nn.Linear(100, 100)
-      self.fc3 = nn.Linear(100, 1)
+      self.fc3 = nn.Linear(100, 100)
+      self.fc4 = nn.Linear(100, 1)
     
     def forward(self, x):
       
@@ -18,6 +19,8 @@ class onedim_model(nn.Module):
       x = self.fc2(x)
       x = F.relu(x)
       x = self.fc3(x)
+      x = F.relu(x)
+      x = self.fc4(x)
 
       return x
 
