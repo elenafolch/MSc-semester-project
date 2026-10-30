@@ -67,7 +67,7 @@ class autoenc(nn.Module):
 
        layers = [x1, x2, x3, x4, d4, d3, d2, d1]
 
-       output_hdu = fits.PrimaryHDU(data=output.detach().numpy())
+       output_hdu = fits.PrimaryHDU(data=output.detach().numpy().astype(float))
 
        return latent, output, output_hdu, layers
 
