@@ -50,12 +50,6 @@ class autoenc(nn.Module):
         self.output = nn.ConvTranspose2d(32, 1, kernel_size=3, stride=2, padding=3, output_padding=1) #(1, 60, 60) 
        
 
-    def rescale(self, tens, lower, upper):
-       min, _ = torch.min(tens, dim=1, keepdim=True)
-       max, _ = torch.max(tens, dim=1, keepdim=True)
-       tens = (tens - min) / (max - min + 1e-9)
-       return tens
-
     def forward(self, x):
        x1 = self.conv1(x)
        x2 = self.conv2(x1)
@@ -69,11 +63,13 @@ class autoenc(nn.Module):
        d2 = self.convT3(d3)
        d1 = self.convT4(d2)
 
-       output = self.rescale(self.output(d1), 0, 1)
+       output = F.sigmoid(self.output(d1))
 
        layers = [x1, x2, x3, x4, d4, d3, d2, d1]
 
-       return latent, output, layers
+       output_hdu = fits.PrimaryHDU(data=output.detach().numpy())
+
+       return latent, output, output_hdu, layers
 
 
 class FizeauDataset(Dataset):
@@ -83,6 +79,11 @@ class FizeauDataset(Dataset):
    def __len__(self):
       return len(self.files)
 
+   def rescale(self, tens, lower, upper):
+      mx = tens.max()
+      mn = tens.min()
+      return (tens - mn) / (mx - mn + 1e-9) * (upper - lower) + lower
+
    def __getitem__(self, index):
       img, hdr = fits.getdata(self.files[index], header=True)
 
@@ -91,6 +92,7 @@ class FizeauDataset(Dataset):
       img = np.astype(img, np.float32)
       img = torch.from_numpy(img)
       img = torch.unsqueeze(img, dim=0)
+      img = self.rescale(img, 0, 1)
 
       return img , opd
     
