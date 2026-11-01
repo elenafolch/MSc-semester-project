@@ -12,8 +12,10 @@ class ConvBlock(nn.Module):
    def __init__(self, in_channels, out_channels): #input shape (in_channels, 60, 60)
       super().__init__()
       self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=2) #output shape (out_channels, 30, 30)
+      self.groupnorm = nn.GroupNorm(8, out_channels)
    def forward(self, x):
     x = self.conv(x)
+    x = self.groupnorm(x)
     x = F.relu(x)
 
     return x
@@ -36,36 +38,33 @@ class autoenc(nn.Module):
         self.conv1 = ConvBlock(in_channels, 32) #(32, 30, 30)
         self.conv2 = ConvBlock(32, 64) #(64, 15, 15)
         self.conv3 = ConvBlock(64, 128) #(128, 8, 8)
-        self.conv4 = ConvBlock(128, 256) #(256, 4, 4)
 
         #bottleneck
-        self.bottleneck = ConvBlock(256, 512) #(512, 2, 2)
+        self.bottleneck = ConvBlock(128, 256) #(256, 4, 4)
 
         #decoder
-        self.convT1 = ConvTBlock(512, 256) #(256, 4, 4)
-        self.convT2 = ConvTBlock(256, 128) #(128, 8, 8)
-        self.convT3 = ConvTBlock(128, 64) #(64, 16, 16)
-        self.convT4 = ConvTBlock(64, 32) #(32, 32, 32)
+        self.convT1 = ConvTBlock(256, 128) #(128, 8, 8)
+        self.convT2 = ConvTBlock(128, 64) #(64, 16, 16)
+        self.convT3 = ConvTBlock(64, 32) #(32, 32, 32)
 
         self.output = nn.ConvTranspose2d(32, 1, kernel_size=3, stride=2, padding=3, output_padding=1) #(1, 60, 60) 
        
 
     def forward(self, x):
-       x1 = self.conv1(x)
-       x2 = self.conv2(x1)
-       x3 = self.conv3(x2)
-       x4 = self.conv4(x3)
+       e1 = self.conv1(x)
+       e2 = self.conv2(e1)
+       e3 = self.conv3(e2)
 
-       latent = self.bottleneck(x4)
+       latent = self.bottleneck(e3)
 
-       d4 = self.convT1(latent)
-       d3 = self.convT2(d4)
-       d2 = self.convT3(d3)
-       d1 = self.convT4(d2)
+       d3 = self.convT1(latent)
+       d2 = self.convT2(d3)
+       d1 = self.convT3(d2)
 
-       output = F.sigmoid(self.output(d1))
+       output = F.relu(self.output(d1))
+       output = (output - output.min()) / (output.max() - output.min() + 1e-9) #rescaling to [0, 1]
 
-       layers = [x1, x2, x3, x4, d4, d3, d2, d1]
+       layers = [e1, e2, e3, d3, d2, d1]
 
        output_hdu = fits.PrimaryHDU(data=output.detach().numpy().astype(float))
 
