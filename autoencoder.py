@@ -24,8 +24,11 @@ class ConvTBlock(nn.Module):
    def __init__(self, in_channels, out_channels):
       super().__init__()
       self.convT = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=2, padding=1, output_padding=1)
+      self.groupnorm = nn.GroupNorm(8, out_channels)
+
    def forward(self, x):
       x = self.convT(x)
+      x = self.groupnorm(x)
       x = F.relu(x)
 
       return x
@@ -38,6 +41,9 @@ class autoenc(nn.Module):
         self.conv1 = ConvBlock(in_channels, 32) #(32, 30, 30)
         self.conv2 = ConvBlock(32, 64) #(64, 15, 15)
         self.conv3 = ConvBlock(64, 128) #(128, 8, 8)
+
+        self.pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1) #halves height and width of image
+
 
         #bottleneck
         self.bottleneck = ConvBlock(128, 256) #(256, 4, 4)
