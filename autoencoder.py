@@ -67,8 +67,8 @@ class autoenc(nn.Module):
        d2 = self.convT2(d3)
        d1 = self.convT3(d2)
 
-       output = F.sigmoid(self.output(d1))
-       #output = (output - output.min()) / (output.max() - output.min() + 1e-9) #rescaling to [0, 1]
+       output = F.relu(self.output(d1))
+       output = (output - output.min()) / (output.max() - output.min() + 1e-9) #rescaling to [0, 1]
 
        layers = [e1, e2, e3, d3, d2, d1]
 
@@ -90,7 +90,7 @@ class FizeauDataset(Dataset):
 
       if self.log:
                      tens = torch.log10(tens.clamp(min=0) + 1e-9)
-                     
+
       mx = tens.max()
       mn = tens.min()
       tens = (tens - mn) / (mx - mn + 1e-9) * (upper - lower) + lower
