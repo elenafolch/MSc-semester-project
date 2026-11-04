@@ -78,16 +78,24 @@ class autoenc(nn.Module):
 
 
 class FizeauDataset(Dataset):
-   def __init__(self, files): #files are .fits
+   def __init__(self, files, log): #files are .fits
       super().__init__()
       self.files = files
+      self.log = log
+
    def __len__(self):
       return len(self.files)
 
    def rescale(self, tens, lower, upper):
+
+      if self.log:
+                     tens = torch.log10(tens.clamp(min=0) + 1e-9)
+                     
       mx = tens.max()
       mn = tens.min()
-      return (tens - mn) / (mx - mn + 1e-9) * (upper - lower) + lower
+      tens = (tens - mn) / (mx - mn + 1e-9) * (upper - lower) + lower
+
+      return tens
 
    def __getitem__(self, index):
       img, hdr = fits.getdata(self.files[index], header=True)
