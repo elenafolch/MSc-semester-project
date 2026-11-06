@@ -71,9 +71,9 @@ for i, learning_rate in enumerate(learning_rates):
         for batch_index, (data, _) in enumerate(tqdm(iter(train_loader))):
             # Move data and targets to the device (GPU/CPU)
             data = data.to(device)
-
+            
             # Forward pass: compute the model output
-            latent, reconstructed, _ = model(data)
+            latent, reconstructed, _, _ = model(data)
             loss_ = loss(reconstructed, data)
             loss_per_epoch.append(loss_.detach().numpy())
             
