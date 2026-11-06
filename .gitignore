@@ -9,6 +9,14 @@ wheels/
 # Virtual environments
 .venv
 
-#fits images
+#images
 .fits
+.pdf
+.png
+
+#image folders
+simulated_images_varied*/
+data/
+dataset/
+
 
