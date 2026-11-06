@@ -10,9 +10,10 @@ wheels/
 .venv
 
 #images
-.fits
-.pdf
-.png
+*.fits
+*.pdf
+*.png
+*.zip
 
 #image folders
 simulated_images_varied*/

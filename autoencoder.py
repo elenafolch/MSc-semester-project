@@ -1,114 +1,124 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset
-from PIL import Image #pillow library used for handling images
-from torchvision import transforms
 import numpy as np
+import time
 
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+from torch import optim
+from torch.utils.data import DataLoader, random_split, Subset
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+from autoencoder_mod import autoenc, FizeauDataset
 from astropy.io import fits
 
-class ConvBlock(nn.Module):
-   def __init__(self, in_channels, out_channels): #input shape (in_channels, 60, 60)
-      super().__init__()
-      self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=2) #output shape (out_channels, 30, 30)
-      self.groupnorm = nn.GroupNorm(8, out_channels)
-   def forward(self, x):
-    x = self.conv(x)
-    x = self.groupnorm(x)
-    x = F.relu(x)
-
-    return x
-
-class ConvTBlock(nn.Module):
-   def __init__(self, in_channels, out_channels):
-      super().__init__()
-      self.convT = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=2, padding=1, output_padding=1)
-      self.groupnorm = nn.GroupNorm(8, out_channels)
-
-   def forward(self, x):
-      x = self.convT(x)
-      x = self.groupnorm(x)
-      x = F.relu(x)
-
-      return x
-    
-
-class autoenc(nn.Module):
-    def __init__(self, in_channels):  #(1, 60, 60)
-        super().__init__()
-        #encoder
-        self.conv1 = ConvBlock(in_channels, 32) #(32, 30, 30)
-        self.conv2 = ConvBlock(32, 64) #(64, 15, 15)
-        self.conv3 = ConvBlock(64, 128) #(128, 8, 8)
-
-        self.pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1) #halves height and width of image
+from astropy.visualization import ZScaleInterval, ImageNormalize, AsinhStretch
 
 
-        #bottleneck
-        self.bottleneck = ConvBlock(128, 256) #(256, 4, 4)
+training_frac = 0.8
+N = 966
+n_training = int(N*training_frac)
+learning_rates = np.array([0.01, 0.001, 0.0001])
+batch_size = 193
+training_epochs = 100
 
-        #decoder
-        self.convT1 = ConvTBlock(256, 128) #(128, 8, 8)
-        self.convT2 = ConvTBlock(128, 64) #(64, 16, 16)
-        self.convT3 = ConvTBlock(64, 32) #(32, 32, 32)
+device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.output = nn.ConvTranspose2d(32, 1, kernel_size=3, stride=2, padding=3, output_padding=1) #(1, 60, 60) 
-       
+data_path = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/simulated_images_varied_OPD_1000/")
+out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions")
 
-    def forward(self, x):
-       e1 = self.conv1(x)
-       e2 = self.conv2(e1)
-       e3 = self.conv3(e2)
+for directory in (data_path, out_root):
+    if not directory.is_dir():
+        directory.mkdir(parents=True)
 
-       latent = self.bottleneck(e3)
+data = sorted(data_path.glob("*.fits"))
+dataset = FizeauDataset(data, log=True)
 
-       d3 = self.convT1(latent)
-       d2 = self.convT2(d3)
-       d1 = self.convT3(d2)
+idxs = np.arange(0, N)
+np.random.shuffle(idxs)
 
-       output = F.relu(self.output(d1))
-       output = (output - output.min()) / (output.max() - output.min() + 1e-9) #rescaling to [0, 1]
+train_idxs = idxs[:n_training]
+test_idxs = idxs[n_training:]
 
-       layers = [e1, e2, e3, d3, d2, d1]
+train_dataset = Subset(dataset, train_idxs)
+test_dataset = Subset(dataset, test_idxs)
 
-       output_hdu = fits.PrimaryHDU(data=output.detach().numpy().astype(float))
+train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-       return latent, output, output_hdu, layers
+loss = nn.L1Loss()
 
 
-class FizeauDataset(Dataset):
-   def __init__(self, files, log): #files are .fits
-      super().__init__()
-      self.files = files
-      self.log = log
+loss_lr = np.zeros((3, 4*training_epochs))
+models = []
 
-   def __len__(self):
-      return len(self.files)
+for i, learning_rate in enumerate(learning_rates):
 
-   def rescale(self, tens, lower, upper):
+    time_0 = time.time()
 
-      if self.log:
-                     tens = torch.log10(tens.clamp(min=0) + 1e-9)
+    print(f"learning rate: {learning_rate}")
+    model = autoenc(1)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-2)
 
-      mx = tens.max()
-      mn = tens.min()
-      tens = (tens - mn) / (mx - mn + 1e-9) * (upper - lower) + lower
 
-      return tens
+    loss_per_epoch = []
 
-   def __getitem__(self, index):
-      img, hdr = fits.getdata(self.files[index], header=True)
+    for epoch in range(training_epochs):
+        print(f"Epoch [{epoch + 1}/{training_epochs}]")
+        for batch_index, (data, _) in enumerate(tqdm(iter(train_loader))):
+            # Move data and targets to the device (GPU/CPU)
+            data = data.to(device)
 
-      opd = torch.tensor(float(hdr["OPD"]), dtype=torch.float32)
+            # Forward pass: compute the model output
+            latent, reconstructed, _ = model(data)
+            loss_ = loss(reconstructed, data)
+            loss_per_epoch.append(loss_.detach().numpy())
+            
+            # Backward pass: compute the gradients
+            optimizer.zero_grad()
+            loss_.backward()
 
-      img = np.astype(img, np.float32)
-      img = torch.from_numpy(img)
-      img = torch.unsqueeze(img, dim=0)
-      img = self.rescale(img, 0, 1)
+            # Optimization step: update the model parameters
+            optimizer.step()
 
-      return img , opd
-    
+    loss_lr[i, :] = np.array(loss_per_epoch)
+    models.append(model)
 
-    
-    
+    time_1 = time.time()
+
+    time_diff_train = time_1 - time_0
+    print(f'Elapsed time to train with learning rate {learning_rate:.0e}: {time_diff_train:.2f} seconds')
+
+    subset = test_loader.dataset
+
+for learning_rate, model in zip(learning_rates, models):
+
+    time_0 = time.time()
+
+    model.eval()
+    lr_dir = out_root / f"lr_{learning_rate:.0e}"
+    if not lr_dir.is_dir():
+        lr_dir.mkdir(parents=True)
+
+    with torch.no_grad():
+        for i, test_data in enumerate(subset):
+            test_img, opd = test_data
+            latent, reconstructed, _, layer_reps = model(test_img)
+
+            src = Path(subset.dataset.files[subset.indices[i]])
+            hdr = fits.Header()
+            hdr["OPD"] = float(opd)
+            hdr["LR"] = float(learning_rate)
+            hdr["SOURCE"] = src.name
+
+            fits.writeto(lr_dir / f"{src.stem}_original.fits", test_img.detach().numpy()[0], hdr, overwrite=True)
+            fits.writeto(lr_dir / f"{src.stem}_reconstructed.fits", reconstructed.detach().numpy()[0], hdr, overwrite=True)
+
+    print(f"wrote {len(subset)} frame pairs to {lr_dir}")
+
+    time_1 = time.time()
+    time_diff_test = time_1 - time_0
+    print(f"Elapsed time to test with learning rate {learning_rate:.0e}: {time_diff_test:.2f} seconds")
