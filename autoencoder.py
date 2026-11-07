@@ -71,7 +71,7 @@ for i, learning_rate in enumerate(learning_rates):
         for batch_index, (data, _) in enumerate(tqdm(iter(train_loader))):
             # Move data and targets to the device (GPU/CPU)
             data = data.to(device)
-            
+
             # Forward pass: compute the model output
             latent, reconstructed, _, _ = model(data)
             loss_ = loss(reconstructed, data)
@@ -106,6 +106,7 @@ for learning_rate, model in zip(learning_rates, models):
     with torch.no_grad():
         for i, test_data in enumerate(subset):
             test_img, opd = test_data
+            test_img = torch.unsqueeze(test_img, dim=0) #image needs to have shape (1, 1, H, W)
             latent, reconstructed, _, layer_reps = model(test_img)
 
             src = Path(subset.dataset.files[subset.indices[i]])
