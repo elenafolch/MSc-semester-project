@@ -40,52 +40,80 @@ dataset = FizeauDataset(data, log=True)
 idxs = np.arange(0, N)
 np.random.shuffle(idxs)
 
+
 train_idxs = idxs[:n_training]
-test_idxs = idxs[n_training:]
+validation_idxs = idxs[n_training:n_training + (N-n_training)//2]
+test_idxs = idxs[n_training+(N-n_training)//2:]
+
 
 train_dataset = Subset(dataset, train_idxs)
+validation_dataset = Subset(dataset, validation_idxs)
 test_dataset = Subset(dataset, test_idxs)
 
 train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+validation_loader = DataLoader(validation_dataset, batch_size=1, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 loss = nn.L1Loss()
 
 
-loss_lr = np.zeros((3, 4*training_epochs))
+loss_lr = np.zeros((3, training_epochs))
 models = []
 
 for i, learning_rate in enumerate(learning_rates):
-
-    time_0 = time.time()
-
     print(f"learning rate: {learning_rate}")
+    time_0 = time.time()
     model = autoenc(1)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-2)
 
-
-    loss_per_epoch = []
-
+    loss_per_epoch = np.zeros(training_epochs)
+    validation_loss_per_epoch = []
+    best_model = model
+    
     for epoch in range(training_epochs):
         print(f"Epoch [{epoch + 1}/{training_epochs}]")
+        model.train()
+        batch_losses = []
+        validation_losses = []
+
         for batch_index, (data, _) in enumerate(tqdm(iter(train_loader))):
             # Move data and targets to the device (GPU/CPU)
             data = data.to(device)
 
             # Forward pass: compute the model output
             latent, reconstructed, _, _ = model(data)
-            loss_ = loss(reconstructed, data)
-            loss_per_epoch.append(loss_.detach().numpy())
-            
+            batch_loss = loss(reconstructed, data)
+            batch_losses.append(batch_loss.detach().numpy())
+
             # Backward pass: compute the gradients
             optimizer.zero_grad()
-            loss_.backward()
+            batch_loss.backward()
 
             # Optimization step: update the model parameters
             optimizer.step()
 
+        #compute mean loss of current epoch on training set
+        loss_per_epoch[epoch] = np.mean(batch_losses)
+
+        model.eval()
+        with torch.no_grad():
+         
+         for val_data in validation_loader:
+            val_img, _ = val_data
+            _, val_reconstructed, _, _ = model(val_img)
+            validation_losses.append(loss(val_reconstructed, val_img))
+                
+        #compute mean loss of current epoch on validation set
+        validation_loss_per_epoch.append(np.mean(validation_losses))
+
+        if epoch >=15:
+            if validation_loss_per_epoch[epoch] > np.mean(validation_loss_per_epoch[-15:]):
+                break
+            else:
+               best_model = model
+
+    models.append(best_model) 
     loss_lr[i, :] = np.array(loss_per_epoch)
-    models.append(model)
 
     time_1 = time.time()
 
