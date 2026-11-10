@@ -100,8 +100,13 @@ class FizeauDataset(Dataset):
    def __getitem__(self, index):
       img, hdr = fits.getdata(self.files[index], header=True)
 
-      opd = torch.tensor(float(hdr["OPD"]), dtype=torch.float32)
-
+      if "OPD" in hdr:
+          opd = torch.tensor(float(hdr["OPD"]), dtype=torch.float32)
+      elif "TIP" in hdr:
+          opd = torch.tensor(float(hdr["TIP"]), dtype=torch.float32)
+      elif "TILT" in hdr:
+               opd = torch.tensor(float(hdr["TILT"]), dtype=torch.float32)
+          
       img = np.astype(img, np.float32)
       img = torch.from_numpy(img)
       img = torch.unsqueeze(img, dim=0)
