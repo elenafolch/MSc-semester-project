@@ -19,16 +19,16 @@ from astropy.visualization import ZScaleInterval, ImageNormalize, AsinhStretch
 
 
 training_frac = 0.8
-N = 966
+N = 1001
 n_training = int(N*training_frac)
 learning_rates = np.array([0.01, 0.001, 0.0001])
-batch_size = 193
+batch_size = n_training//4
 training_epochs = 100
 
 device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-data_path = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/simulated_images_varied_OPD_1000/")
-out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions")
+data_path = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/simulated_images_varied_tip_and_tilt_1000/")
+out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions_tip_tilt")
 
 for directory in (data_path, out_root):
     if not directory.is_dir():

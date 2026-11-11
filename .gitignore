@@ -15,6 +15,9 @@ wheels/
 *.png
 *.zip
 
+#nn.Module() instances
+*.pt
+
 #image folders
 simulated_images_varied*/
 data/
