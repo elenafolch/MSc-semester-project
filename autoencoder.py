@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import time
+import json
 
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
@@ -12,18 +13,11 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from autoencoder_mod import autoenc, FizeauDataset
+from autoencoder_mod import autoenc, FizeauDataset, set_hyperparams
 from astropy.io import fits
 
 from astropy.visualization import ZScaleInterval, ImageNormalize, AsinhStretch
 
-
-training_frac = 0.8
-N = 1001
-n_training = int(N*training_frac)
-learning_rates = np.array([0.01, 0.001, 0.0001])
-batch_size = n_training//4
-training_epochs = 100
 
 device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -36,6 +30,14 @@ for directory in (data_path, out_root):
 
 data = sorted(data_path.glob("*.fits"))
 dataset = FizeauDataset(data, log=True)
+
+learning_rates, batch_part, bottleneck = set_hyperparams("hyperparameter_grid.json", 0)
+
+N = len(dataset)
+training_frac = 0.8
+n_training = int(N*training_frac)
+batch_size = n_training//batch_part
+training_epochs = 100
 
 idxs = np.arange(0, N)
 np.random.shuffle(idxs)

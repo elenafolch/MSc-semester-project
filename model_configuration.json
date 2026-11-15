@@ -1,0 +1,9 @@
+{
+    "model": {
+        "n_encoder_layers": 3
+    },
+    "training": {
+        "learning_rate": 0.001,
+        "batch_part": 0.25
+    }
+}
