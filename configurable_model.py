@@ -103,3 +103,10 @@ def random_indices(low, high, size, tuples):
                         index_tuples[i, :] = indices
 
        return index_tuples
+
+def give_configuration(indices, parameter_grid):
+    indices = indices.astype(int)
+    lr = parameter_grid["learning_rate"][indices[0]]
+    batch = parameter_grid["batch_part"][indices[1]]
+    enco = parameter_grid["n_encoder_layers"][indices[2]]
+    return [f"learning rate {lr}, batch part {batch}, encoder layers {enco}"], lr, batch, enco

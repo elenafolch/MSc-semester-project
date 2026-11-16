@@ -3,7 +3,7 @@
         "n_encoder_layers": 3
     },
     "training": {
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "batch_part": 0.2
     }
 }
