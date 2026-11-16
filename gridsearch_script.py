@@ -20,12 +20,11 @@ from astropy.visualization import ZScaleInterval, ImageNormalize, AsinhStretch
 
 n_combinations = 5
 random_gridsearch_indices = random_indices(0, 3, 3, n_combinations)
-random_gridsearch_indices.shape
 
 training_frac = 0.8
 N = 1001
 n_training = int(N*training_frac)
-training_epochs = 10
+training_epochs = 100
 
 device  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -136,7 +135,7 @@ for j, indices in enumerate(random_gridsearch_indices):
     loss_conf[j, :] = np.array(loss_per_epoch)
 
 data_path = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/simulated_images_varied_tip_and_tilt_1000/")
-out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions_tip_tilt_confs")
+out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions_tip_tilt_confs_100ep")
 
 subset = test_loader.dataset
 
