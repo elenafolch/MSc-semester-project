@@ -87,3 +87,19 @@ class configAutoenc(nn.Module):
             
             return output, bottleneck_rep, latent_reps, self.bottleneck_dim
             
+def random_indices(low, high, size, tuples):
+       """
+       returns an array containing random tuples of indices without repetition
+       """
+       index_tuples = np.zeros((tuples, size))
+
+       for i in range(tuples):
+              indices = np.array([np.random.randint(low=low, high=high, size=size)])
+
+              for k in range(i):
+                     if np.array_equal(index_tuples[k, :], indices):
+                        break
+                     else:
+                        index_tuples[i, :] = indices
+
+       return index_tuples
