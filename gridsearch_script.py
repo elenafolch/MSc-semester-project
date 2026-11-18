@@ -18,7 +18,7 @@ from astropy.io import fits
 
 from astropy.visualization import ZScaleInterval, ImageNormalize, AsinhStretch
 
-n_combinations = 5
+n_combinations = 6
 random_gridsearch_indices = random_indices(0, 3, 3, n_combinations)
 
 training_frac = 0.8
@@ -91,7 +91,7 @@ for j, indices in enumerate(random_gridsearch_indices):
         model.train()
         batch_losses = []
         
-        for batch_index, (data, _) in enumerate(tqdm(iter(train_loader))):
+        for batch_index, (data, _, _, _) in enumerate(tqdm(iter(train_loader))):
             # Move data and targets to the device (GPU/CPU)
             data = data.to(device)
 
@@ -115,7 +115,7 @@ for j, indices in enumerate(random_gridsearch_indices):
         with torch.no_grad():
              
             for val_data in validation_loader:
-                val_img, _ = val_data
+                val_img, _, _, _= val_data
                 val_reconstructed, _, _, _ = model(val_img)
                 validation_loss.append(loss(val_reconstructed, val_img))
 
@@ -134,14 +134,14 @@ for j, indices in enumerate(random_gridsearch_indices):
     models.append(best_model) 
     loss_conf[j, :] = np.array(loss_per_epoch)
 
-data_path = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/simulated_images_varied_tip_and_tilt_1000/")
-out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions_tip_tilt_confs_100ep")
+out_root = Path("/home/ipa/quanz/user_accounts/efolch/semproj/code/reconstructions_tip_tilt_6confs_100ep")
+#out_root = Path(r"C:\Users\Elena\OneDrive - ETH Zurich\Dokumente\HS26\MSc semester project")
 
 subset = test_loader.dataset
 
-for indices, model in zip(random_gridsearch_indices, models):
+for idxs, model in zip(random_gridsearch_indices, models):
 
-    conf_signature, _, _, _ = give_configuration(indices=indices, parameter_grid=hyperparams)
+    conf_signature, _, _, _ = give_configuration(indices=idxs, parameter_grid=hyperparams)
     model.eval()
     conf_dir = out_root / "_".join(str(x) for x in conf_signature)
     if not conf_dir.is_dir():
@@ -149,13 +149,15 @@ for indices, model in zip(random_gridsearch_indices, models):
 
     with torch.no_grad():
         for i, test_data in enumerate(subset):
-            test_img, opd = test_data
+            test_img, opd, tip, tilt = test_data
             test_img = torch.unsqueeze(test_img, dim=0) #image needs to have shape (1, 1, H, W)
-            reconstructed, bottleneck_rep, layer_reps, _ = model(test_img)
+            reconstructed, _, _, _ = model(test_img)
 
             src = Path(subset.dataset.files[subset.indices[i]])
             hdr = fits.Header()
             hdr["OPD"] = float(opd)
+            hdr["TIP"] = float(tip)
+            hdr["TILT"] = float(tilt)
             hdr["SOURCE"] = src.name
 
             fits.writeto(conf_dir / f"{src.stem}_original.fits", test_img.detach().numpy()[0], hdr, overwrite=True)
