@@ -91,16 +91,23 @@ def random_indices(low, high, size, tuples):
        """
        returns an array containing random tuples of indices without repetition
        """
-       index_tuples = np.zeros((tuples, size))
 
-       for i in range(tuples):
-              indices = np.array([np.random.randint(low=low, high=high, size=size)])
+       if tuples > (high - low)**size:
+        raise ValueError(f"{tuples} exceeds number of existing distinct tuples")
+       
+       index_tuples = []
+       combinations = set()
 
-              for k in range(i):
-                     if np.array_equal(index_tuples[k, :], indices):
-                        break
-                     else:
-                        index_tuples[i, :] = indices
+       while len(index_tuples) < tuples:
+              indices = tuple(np.random.randint(low=low, high=high, size=size))
+              if indices not in combinations:
+                     index_tuples.append(indices)
+                     combinations.add(indices)
+              
+       return np.array([index_tuples]).reshape((tuples, size))
+                     
+      
+                        
 
        return index_tuples
 
